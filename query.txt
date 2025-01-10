@@ -1,0 +1,13 @@
+"Parse the attached resume PDF and map the extracted data into the provided JSON layout structure. Ensure the following:
+
+Use the JSON Layout: Populate the provided JSON layout file's structure, including jobTitle, pageDescription, pageTitle, contactDetails, and sections.
+Populate Each Section:
+contactDetails: Extract name, email, phone, address, city, and state from the resume.
+sections: Include sections such as Professional Experience, Skills, Certifications, and Education. Populate their titles, descriptions, and items accordingly.
+For each project in Professional Experience:
+Include keys: company, title, startDate, endDate, description, and presentlyEmployed.
+Structure each project under description with projectName, technologies, and projectDescription.
+Include skills grouped by categories (e.g., Programming Languages, Frameworks and Libraries).
+Ensure Consistency: Maintain the same key names and structure as the provided JSON layout.
+Handle Missing Data Gracefully: Leave values as null if certain details are missing in the resume.
+Output the final JSON, fully populated with the resume data, following the structure provided in the layout."

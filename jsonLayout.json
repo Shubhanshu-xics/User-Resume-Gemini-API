@@ -1,0 +1,45 @@
+{
+    "node": {
+        "jobTitle": "",
+        "pageDescription": "",
+        "pageTitle": "",
+        "resume": {
+            "contactDetails": {
+                "address": "",
+                "city": "",
+                "email": "",
+                "firstName": "",
+                "lastName": "",
+                "phone": "",
+                "state": ""
+            },
+            "sections": [
+                {
+                    "description": "",
+                    "name": "",
+                    "title": "",
+                    "items": null
+                },
+                {
+                    "description": null,
+                    "name": "",
+                    "title": "",
+                    "items": [
+                        {
+                            "city": "",
+                            "company": null,
+                            "description": null,
+                            "presentlyEmployed": null,
+                            "qualification": "",
+                            "school": "",
+                            "startDate": null,
+                            "endDate": null,
+                            "state": "",
+                            "title": null
+                        }
+                    ]
+                }
+            ]
+        }
+    }
+}
