@@ -14,9 +14,10 @@ import google.generativeai as genai
 import os
 import json
 import asyncio
-from bson import ObjectId
 
 
+
+# Disable warnings
 warnings.filterwarnings("ignore", message="numpy.dtype size changed")
 warnings.filterwarnings("ignore", message="numpy.ufunc size changed")
 
@@ -29,45 +30,14 @@ app = FastAPI()
 lock = asyncio.Lock()
 import time
 
-# new add code
-# Helper Function to Check for Duplicate Email or Phone
-def check_duplicate_email_or_phone(email: str, phone: str):
-    """
-    Check if the email or phone already exists in the collection.
-    
-    :param(parameter) email: The email address to check.
-    :param phone: The phone to check.
-    :return: The existing resume document if found, else None.
-    """
-    # Query the collection to find a document where either the email or phone matches
-    existing_resume = collection.find_one({"$or": [{"email": email}, {"phone": phone}]})
-    return existing_resume  # Return the found document or None if no match
 
-# new add code
-# Function to Update Existing Resume
-def update_existing_resume(existing_resume, new_data):
-    """
-    Update the fields of an existing resume, excluding email and phone.
-    
-    :param existing_resume: The document to update.
-    :param new_data: The new data to apply to the resume.
-    :return: The updated resume document.
-    """
-    # Filter out 'email' and 'phone' from new_data to avoid updating these fields
-    update_data = {key: value for key, value in new_data.items() if key not in ["email", "phone"]}
-    # Update the document in the collection based on its '_id'
-    collection.update_one({"_id": existing_resume["_id"]}, {"$set": update_data})
-    updated_resume = collection.find_one({"_id": existing_resume["_id"]})  # Fetch updated document
-    return updated_resume
+        
 
 
 
-# Function to write log
 def write_log(message: str):
     with open("log.txt", "a") as log_file:
         log_file.write(f"{message}\n")
-    print(message)
-
 
 # Function to extract text from PDF
 def extract_text_from_pdf(file_path):
@@ -78,7 +48,6 @@ def extract_text_from_pdf(file_path):
         print(f"Error extracting text from PDF: {e}")
         return ""
 
-
 # Function to extract text from DOCX
 def extract_text_from_docx(file_path):
     try:
@@ -87,7 +56,6 @@ def extract_text_from_docx(file_path):
     except Exception as e:
         print(f"Error extracting text from DOCX: {e}")
         return ""
-
 
 def gemini_call(text_, json_format, model, query):
     try:
@@ -109,7 +77,6 @@ def gemini_call(text_, json_format, model, query):
         print(f"Error Gemini: {e}")
         return {"Error": "Gemini failed"}
     
-
 async def convert_into_text(file_path):
     try:
         print("Convert file data into binary text")
@@ -142,106 +109,76 @@ async def read_files():
 
     return json_format, query
 
-
-async def write_resume_binary(file: UploadFile):
-    if file is None:
-        raise ValueError("The file parameter is None.")
-
-    file_name = file.filename if hasattr(file, "filename") else "uploaded_file"
-    file_location = f"temp/{file_name}"
-    os.makedirs("temp", exist_ok=True)  # Ensure 'temp' folder exists
-
-    try:
-        file_data = await file.read()  # Read the file content
-        with open(file_location, "wb") as f:
-            f.write(file_data)  # Write content to a temporary file
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error writing file: {e}")
-    finally:
-        file.close()  # Ensure the file is closed properly
-
+async def write_resume_binary(file):
+    file_location = f"temp/{file.filename}"
+    file_data = await file.read()
+    print("Building sample file")
+    with open(file_location, "wb") as f:
+        f.write(file_data)
     return file_location
 
 
-
-
-
 async def fetch_data(file, results):
-    print('Query and JSON file reading')
-
-    # Read the files for JSON and query configuration
-    file_read = asyncio.create_task(read_files())
-
-    # Write file to disk
-    file_location = await write_resume_binary(file)  # Await directly, no need for `create_task`
-
-    print(f'File created at location: {file_location}')
-    text = await convert_into_text(file_location)
-
-    print('Gemini configuration')
-    model = gemini_configure()
-
-    json_format, query = await file_read
-    print('Calling Gemini')
-    result = gemini_call(text, json_format, model, query)
-
-    # Handle result data (e.g., insert/update in DB)
-    email = result.get('email')
-    phone = result.get('phone')
-
-    
-
-   
-   
-    # new add code
-    # Main Logic
-    existing_resume = check_duplicate_email_or_phone(email, phone)
-    
-    #new add code
-    if existing_resume:
-        # Update the existing resume if duplicate is found
-        print(f"Duplicate found for email: {email} or phone: {phone}. Updating the existing record.")
-
-         # Update the existing resume with the new data
-        updated_resume = update_existing_resume(existing_resume, result)
-
-        # Convert the '_id' field to a string for further processing
-
-        updated_resume['_id'] = str(updated_resume['_id'])
+    try:
+        file_read = asyncio.create_task(read_files())
+        file_location = asyncio.create_task(write_resume_binary(file))
         
-        # Add the updated resume to the results list
-
-        results.append(updated_resume)
-    else:
-        # No duplicate found: Insert a new resume into the databas
-        print('Insert data in DB')
-
-        # Insert the new resume into the collection
-        new_resume = result.copy()
-        new_resume["_id"] = str(ObjectId())  # Generate a new ID for the new document
-
-        collection.insert_one(new_resume)
-
-        # Convert the '_id' field of the newly inserted document to a string
-
-        new_resume['_id'] = str(new_resume['_id'])
-
-        # Add the new resume to the results list
+        file_location_ = await file_location
+        print(f"File saved at: {file_location_}")
         
-        results.append(new_resume)
-    
-    # Clean up the temporary file
-    os.remove(file_location)
-    return
+        text = asyncio.create_task(convert_into_text(file_location_))
+        model = gemini_configure()
+        
+        json_format, query = await file_read
+        text_ = await text
+        print(f"Extracted text: {text_}")
+        
+        if not text_:
+            raise ValueError("No text extracted from the file.")
+        
+        result = gemini_call(text_, json_format, model, query)
+        print(f"Gemini output: {result}")
 
+        # Ensure email and phone exist in the result
+        email = result['node']['resume']['contactDetails']['email']
+        phone = result['node']['resume']['contactDetails']['phone']
+        print(email,phone)
+
+        if email or phone:
+            print (f"Checking for existing records with email: {email} or phone: {phone}")
+            existing_record = collection.find_one({"$or": [{"email": email}, {"phone": phone}]})
+
+            if existing_record:
+                print(f"Updating record with ID: {existing_record['_id']}")
+                collection.replace_one({"_id": existing_record["_id"]}, result, upsert=True)
+                result["_id"] = str(existing_record["_id"])
+            else:
+                print("Inserting new record")
+                inserted_id = collection.insert_one(result).inserted_id
+                result["_id"] = str(inserted_id)
+        else:
+            raise ValueError("Email or phone not found in the extracted data.")
+        
+        results.append(result)
+    
+    except Exception as e:
+        print(f"Error during fetch_data: {e}")
+    
+    finally:
+        if os.path.exists(file_location_):
+            os.remove(file_location_)
+            print(f"File removed from: {file_location_}")
 
 @app.post("/upload/")
 async def upload_resumes(files: List[UploadFile] = File(...)):
     results = []
-    print('Hello')
-    for file in files:
-        await fetch_data(file, results)
-  
+    try:
+        print("Starting file upload process.")
+        await fetch_data(files[0], results)
+    except Exception as e:
+        print(f"Error in upload_resumes: {e}")
+        raise HTTPException(status_code=500, detail="An error occurred while processing the file.")
+    
     return results
 
 
@@ -249,7 +186,6 @@ def serialize_document(doc):
     if '_id' in doc:
         doc['_id'] = str(doc['_id'])
     return doc
-
 
 @app.get("/resumes/")
 async def get_resumes():
@@ -260,4 +196,4 @@ async def get_resumes():
 
 
 if __name__ == '__main__':
-    uvicorn.run(app, port=9000, host='0.0.0.0')    
+    uvicorn.run(app, port=9000, host='0.0.0.0')
