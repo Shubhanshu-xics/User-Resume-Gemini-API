@@ -14,10 +14,9 @@ import google.generativeai as genai
 import os
 import json
 import asyncio
+from bson import ObjectId
 
 
-
-# Disable warnings
 warnings.filterwarnings("ignore", message="numpy.dtype size changed")
 warnings.filterwarnings("ignore", message="numpy.ufunc size changed")
 
@@ -31,13 +30,14 @@ lock = asyncio.Lock()
 import time
 
 
-        
 
 
-
+# Function to write log
 def write_log(message: str):
     with open("log.txt", "a") as log_file:
         log_file.write(f"{message}\n")
+    print(message)
+
 
 # Function to extract text from PDF
 def extract_text_from_pdf(file_path):
@@ -48,6 +48,7 @@ def extract_text_from_pdf(file_path):
         print(f"Error extracting text from PDF: {e}")
         return ""
 
+
 # Function to extract text from DOCX
 def extract_text_from_docx(file_path):
     try:
@@ -56,6 +57,7 @@ def extract_text_from_docx(file_path):
     except Exception as e:
         print(f"Error extracting text from DOCX: {e}")
         return ""
+
 
 def gemini_call(text_, json_format, model, query):
     try:
@@ -77,6 +79,7 @@ def gemini_call(text_, json_format, model, query):
         print(f"Error Gemini: {e}")
         return {"Error": "Gemini failed"}
     
+
 async def convert_into_text(file_path):
     try:
         print("Convert file data into binary text")
@@ -109,13 +112,26 @@ async def read_files():
 
     return json_format, query
 
-async def write_resume_binary(file):
-    file_location = f"temp/{file.filename}"
-    file_data = await file.read()
-    print("Building sample file")
-    with open(file_location, "wb") as f:
-        f.write(file_data)
+
+async def write_resume_binary(file: UploadFile):
+    if file is None:
+        raise ValueError("The file parameter is None.")
+
+    file_name = file.filename if hasattr(file, "filename") else "uploaded_file"
+    file_location = f"temp/{file_name}"
+    os.makedirs("temp", exist_ok=True)  # Ensure 'temp' folder exists
+
+    try:
+        file_data = await file.read()  # Read the file content
+        with open(file_location, "wb") as f:
+            f.write(file_data)  # Write content to a temporary file
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error writing file: {e}")
+    finally:
+        file.close()  # Ensure the file is closed properly
+
     return file_location
+
 
 
 async def fetch_data(file, results):
@@ -146,7 +162,8 @@ async def fetch_data(file, results):
 
         if email or phone:
             print (f"Checking for existing records with email: {email} or phone: {phone}")
-            existing_record = collection.find_one({"$or": [{"email": email}, {"phone": phone}]})
+            existing_record = collection.find_one({"$or": [{"node.resume.contactDetails.email": email},
+                                                                        {"node.resume.contactDetails.phone": phone}]})
 
             if existing_record:
                 print(f"Updating record with ID: {existing_record['_id']}")
@@ -169,16 +186,16 @@ async def fetch_data(file, results):
             os.remove(file_location_)
             print(f"File removed from: {file_location_}")
 
+
+
+
 @app.post("/upload/")
 async def upload_resumes(files: List[UploadFile] = File(...)):
     results = []
-    try:
-        print("Starting file upload process.")
-        await fetch_data(files[0], results)
-    except Exception as e:
-        print(f"Error in upload_resumes: {e}")
-        raise HTTPException(status_code=500, detail="An error occurred while processing the file.")
-    
+    print('Hello')
+    for file in files:
+        await fetch_data(file, results)
+  
     return results
 
 
@@ -186,6 +203,7 @@ def serialize_document(doc):
     if '_id' in doc:
         doc['_id'] = str(doc['_id'])
     return doc
+
 
 @app.get("/resumes/")
 async def get_resumes():
@@ -196,4 +214,4 @@ async def get_resumes():
 
 
 if __name__ == '__main__':
-    uvicorn.run(app, port=9000, host='0.0.0.0')
+    uvicorn.run(app, port=9000, host='0.0.0.0')    
